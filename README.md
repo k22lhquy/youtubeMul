@@ -1,6 +1,6 @@
 # SyncScreen
 
-Web xem video cùng nhau: host tạo phòng, gửi link mời, mọi người tự phát cùng một URL video. Host điều khiển play, pause, seek; các client tự sửa lệch thời gian.
+Web xem video cùng nhau: host tạo phòng, gửi link mời, mọi người tự phát cùng một URL YouTube, MP4 hoặc HLS. Host điều khiển play, pause, seek; các client tự sửa lệch thời gian.
 
 ## Chạy local
 
@@ -13,7 +13,7 @@ npm start
 
 Mở `http://localhost:3000`. Khi code giao diện: chạy `npm start` và, ở terminal khác, chạy `npm run dev` rồi mở `http://localhost:5173`.
 
-1. Host nhập tên và URL MP4 hoặc HLS (`.m3u8`) có thể truy cập từ trình duyệt.
+1. Host nhập tên và URL YouTube, MP4 hoặc HLS (`.m3u8`) có thể truy cập từ trình duyệt.
 2. Host tạo phòng rồi bấm **Sao chép link mời**.
 3. Người khác mở link, nhập tên và tham gia. Không cần nhập lại URL video.
 

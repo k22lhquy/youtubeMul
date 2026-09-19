@@ -20,7 +20,7 @@ export function useWatchRoom(playerRef) {
     if (!player || !next) return;
     const drift = expectedPosition(next) - player.currentTime;
     applyingRef.current = Date.now() + 700;
-    if (Math.abs(drift) > 1) player.currentTime = expectedPosition(next);
+    if (Math.abs(drift) > 1 || (Math.abs(drift) > 0.25 && player.canNudge === false)) player.currentTime = expectedPosition(next);
     else if (Math.abs(drift) > 0.25 && !next.isHost) {
       player.playbackRate = drift > 0 ? 1.04 : 0.96;
       window.setTimeout(() => { player.playbackRate = 1; }, 1800);
@@ -52,15 +52,20 @@ export function useWatchRoom(playerRef) {
       socket.on("room-error", setError);
       socket.on("connect_error", () => setError("Phiên đăng nhập không hợp lệ hoặc server không phản hồi."));
       socket.on("disconnect", () => setStatus("Mất kết nối, đang thử lại…"));
-      socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl }, (next) => next.error ? setError(next.error) : setRoom(next)));
+      socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl }, (next) => {
+        if (next.error) return setError(next.error);
+        history.replaceState({}, "", `/#${next.roomId}`);
+        setRoom(next);
+      }));
     } catch (err) { setError(err.message); }
   }, []);
 
-  const action = useCallback((action, extra = {}) => {
+  const action = useCallback((action, extra = {}, force = false) => {
     const player = playerRef.current;
-    if (!room?.isHost || !player || Date.now() < applyingRef.current) return;
-    socketRef.current?.emit("room-action", { action, position: player.currentTime, ...extra });
-  }, [playerRef, room]);
+    if (!room?.isHost || (!force && (!player || Date.now() < applyingRef.current))) return;
+    socketRef.current?.emit("room-action", { action, position: player?.currentTime ?? expectedPosition(), ...extra });
+  }, [expectedPosition, playerRef, room]);
 
-  return { room, status, error, join, action, syncPlayback };
+  const control = useCallback((name, extra = {}) => action(name, extra, true), [action]);
+  return { room, status, error, join, action, control, syncPlayback, reportError: setError };
 }
