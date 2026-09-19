@@ -11,17 +11,17 @@
       <section class="hero" id="lobby">
         <p class="eyebrow">SYNCED WATCH PARTY</p>
         <h1>Xem cùng một khoảnh khắc.</h1>
-        <p class="lede">Tạo phòng, gửi link, cùng xem video. Bản đầu dùng URL video công khai.</p>
+          <p class="lede" id="room-intro">Tạo phòng, gửi link, cùng xem video. Bản đầu dùng URL video công khai.</p>
         <form id="room-form" class="card">
           <label>
             Tên hiển thị
             <input id="name" maxlength="32" placeholder="Quy" required />
           </label>
           <label>
-            URL video MP4/HLS
-            <input id="video-url" type="url" placeholder="https://.../movie.mp4" required />
+            URL video MP4/HLS <span id="video-required">(host nhập)</span>
+            <input id="video-url" type="url" placeholder="https://.../movie.mp4 hoặc .m3u8" required />
           </label>
-          <button>Tạo phòng</button>
+          <button id="join-button">Tạo phòng</button>
         </form>
       </section>
 
@@ -34,14 +34,21 @@
         <div class="stage">
           <video id="player" controls playsinline></video>
           <aside>
-            <span class="status"><i></i> Sẵn sàng đồng bộ</span>
+            <span class="status" id="sync-status"><i></i> Đang kết nối</span>
             <h2 id="movie-title">Video của phòng</h2>
-            <p>Phần đồng bộ thời gian sẽ được kết nối ở task tiếp theo.</p>
-            <div class="people"><strong>1</strong> người trong phòng</div>
+            <p id="host-note">Host điều khiển. Máy khác tự sửa lệch thời gian.</p>
+            <div class="people" id="people"></div>
+            <label class="change-video hidden" id="change-video">
+              Đổi video
+              <input id="new-video-url" type="url" placeholder="https://..." />
+              <button id="change-video-button" type="button">Đổi video</button>
+            </label>
           </aside>
         </div>
       </section>
     </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/vendor/hls.min.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

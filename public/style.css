@@ -29,4 +29,6 @@ aside p { color: #9da3b5; line-height: 1.55; }
 .status i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; background: #70e0a1; border-radius: 50%; }
 .people { margin-top: 25px; padding-top: 16px; border-top: 1px solid #2b3042; color: #aeb3c2; }
 .people strong { color: #fff; font-size: 1.2rem; }
+.change-video { margin-top: 24px; }
+.change-video button { margin-top: 3px; }
 @media (max-width: 760px) { main { padding: 18px; } .stage { grid-template-columns: 1fr; } h1 { font-size: 3.5rem; } }
