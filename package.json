@@ -4,15 +4,18 @@
   "private": true,
   "description": "A minimal synchronized watch-party room.",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --env-file-if-exists=.env server.js",
     "dev": "vite --config client/vite.config.js",
     "build": "vite build --config client/vite.config.js",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
     "test": "node --test"
   },
   "dependencies": {
     "express": "^5.2.1",
     "hls.js": "^1.7.3",
     "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "socket.io": "^4.8.3"

@@ -6,6 +6,7 @@ Web xem video cùng nhau: host tạo phòng, gửi link mời, mọi người t�
 
 ```bash
 npm install
+npm run db:up
 npm run build
 npm start
 ```
@@ -31,9 +32,11 @@ client/src/
   hooks/        # useWatchRoom
 ```
 
-- Backend: Express MVC, Socket.IO, JWT guest token 24 giờ.
+- Backend: Express MVC, Socket.IO, PostgreSQL và JWT guest token 24 giờ.
 - Frontend: React, Vite, Tailwind CSS và custom hook `useWatchRoom`.
-- Chưa thêm database/password: guest JWT là đủ cho phòng tạm thời; thêm Mongo/Postgres khi cần tài khoản và lưu room.
+- PostgreSQL lưu guest và trạng thái phòng; thành viên đang online vẫn nằm trong RAM vì socket là kết nối tạm thời.
+
+Database local chạy bằng Docker Compose tại `127.0.0.1:5432`. Cấu hình mặc định nằm trong `compose.yaml`; sao chép `.env.example` thành `.env` nếu muốn đổi connection string hoặc JWT secret.
 
 ## Đồng bộ
 
@@ -53,7 +56,7 @@ client/src/
 - Dùng URL ký tạm thời nếu video riêng tư.
 - Proxy production phải cho phép WebSocket upgrade.
 
-MVP giữ room trong RAM, nên room bị mất khi server restart và không phù hợp nhiều instance. Khi cần scale: thay room state bằng Redis và dùng adapter Socket.IO cho Redis.
+Trạng thái room được lưu PostgreSQL. Danh sách socket online nằm trong RAM nên chưa phù hợp nhiều instance; khi cần scale, thêm Redis adapter cho Socket.IO.
 
 ## Deploy Railway
 
@@ -71,5 +74,5 @@ Test hiện có xác nhận host sync seek đến guest và quyền host đượ
 
 ## Giới hạn hiện tại
 
-- Chưa có tài khoản/password, chat, upload hay lịch sử phòng.
+- Chưa có tài khoản/password, chat, upload hay giao diện lịch sử phòng.
 - Chỉ dùng video bạn có quyền chia sẻ; không rehost hoặc vượt điều khoản nguồn video.

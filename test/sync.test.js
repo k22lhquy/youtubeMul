@@ -3,6 +3,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const test = require("node:test");
 const { io } = require("socket.io-client");
+const { Pool } = require("pg");
 
 const root = path.join(__dirname, "..");
 const waitFor = (emitter, event) => new Promise((resolve) => emitter.once(event, resolve));
@@ -21,25 +22,32 @@ test("host seek synchronizes and host role transfers", async (t) => {
   });
 
   const url = `http://127.0.0.1:${port}`;
+  const roomCode = `TEST-${Date.now()}`;
+  const db = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://syncscreen:syncscreen-local@127.0.0.1:5432/syncscreen" });
   const tokenFor = async (name) => {
     const response = await fetch(`${url}/api/auth/guest`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     });
     assert.equal(response.status, 200);
-    return (await response.json()).token;
+    return response.json();
   };
-  const [hostToken, guestToken] = await Promise.all([tokenFor("Host"), tokenFor("Guest")]);
-  const host = io(url, { auth: { token: hostToken }, transports: ["websocket"] });
-  const guest = io(url, { auth: { token: guestToken }, transports: ["websocket"] });
+  const [hostAuth, guestAuth] = await Promise.all([tokenFor("Test Host"), tokenFor("Test Guest")]);
+  t.after(async () => {
+    await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
+    await db.query("DELETE FROM users WHERE id = ANY($1::uuid[])", [[hostAuth.user.id, guestAuth.user.id]]);
+    await db.end();
+  });
+  const host = io(url, { auth: { token: hostAuth.token }, transports: ["websocket"] });
+  const guest = io(url, { auth: { token: guestAuth.token }, transports: ["websocket"] });
   t.after(() => host.close());
   t.after(() => guest.close());
   await Promise.all([waitFor(host, "connect"), waitFor(guest, "connect")]);
 
   const hostRoom = await new Promise((resolve) => host.emit("join-room", {
-    roomId: "TEST-ROOM", videoUrl: "https://example.com/movie.mp4",
+    roomId: roomCode, videoUrl: "https://example.com/movie.mp4",
   }, resolve));
   const guestRoom = await new Promise((resolve) => guest.emit("join-room", {
-    roomId: "TEST-ROOM",
+    roomId: roomCode,
   }, resolve));
   assert.equal(hostRoom.isHost, true);
   assert.equal(guestRoom.isHost, false);
@@ -56,6 +64,8 @@ test("host seek synchronizes and host role transfers", async (t) => {
   host.emit("room-action", { action: "seek", position: 42 });
   const update = await synced;
   assert.equal(update.state.position, 42);
+  const persisted = await db.query("SELECT position FROM rooms WHERE code = $1", [roomCode]);
+  assert.equal(persisted.rows[0].position, 42);
 
   const transferred = waitFor(guest, "room-state");
   host.close();
