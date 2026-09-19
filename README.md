@@ -37,6 +37,12 @@ Mở hai cửa sổ trình duyệt để thử. Trình duyệt có thể yêu c�
 
 MVP giữ room trong RAM, nên room bị mất khi server restart và không phù hợp nhiều instance. Khi cần scale: thay room state bằng Redis và dùng adapter Socket.IO cho Redis.
 
+## Deploy Railway
+
+Repository đã có `Dockerfile`; Railway tự nhận diện nó. Trong Railway Dashboard, tạo **New Project** → **Deploy from GitHub repo** → chọn `k22lhquy/youtubeMul` → **Deploy Now**. Sau khi build xong, vào service settings và chọn **Generate Domain**.
+
+Railway tự deploy lại mỗi khi có commit mới trên `main`. Không cần biến môi trường ngoài `PORT`, vì Railway tự cấp giá trị này.
+
 ## Kiểm tra
 
 ```bash
