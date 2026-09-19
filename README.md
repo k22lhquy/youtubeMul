@@ -6,16 +6,34 @@ Web xem video cùng nhau: host tạo phòng, gửi link mời, mọi người t�
 
 ```bash
 npm install
+npm run build
 npm start
 ```
 
-Mở `http://localhost:3000`.
+Mở `http://localhost:3000`. Khi code giao diện: chạy `npm start` và, ở terminal khác, chạy `npm run dev` rồi mở `http://localhost:5173`.
 
 1. Host nhập tên và URL MP4 hoặc HLS (`.m3u8`) có thể truy cập từ trình duyệt.
 2. Host tạo phòng rồi bấm **Sao chép link mời**.
 3. Người khác mở link, nhập tên và tham gia. Không cần nhập lại URL video.
 
 Mở hai cửa sổ trình duyệt để thử. Trình duyệt có thể yêu cầu người xem bấm Play lần đầu vì chính sách autoplay.
+
+## Cấu trúc
+
+```
+src/
+  controllers/  # auth + Socket.IO room controller
+  middleware/   # kiểm tra JWT trên Socket.IO handshake
+  models/       # RoomStore in-memory
+  routes/       # REST routes
+client/src/
+  components/   # Lobby, VideoPlayer, RoomPanel
+  hooks/        # useWatchRoom
+```
+
+- Backend: Express MVC, Socket.IO, JWT guest token 24 giờ.
+- Frontend: React, Vite, Tailwind CSS và custom hook `useWatchRoom`.
+- Chưa thêm database/password: guest JWT là đủ cho phòng tạm thời; thêm Mongo/Postgres khi cần tài khoản và lưu room.
 
 ## Đồng bộ
 
@@ -41,7 +59,7 @@ MVP giữ room trong RAM, nên room bị mất khi server restart và không ph�
 
 Repository đã có `Dockerfile`; Railway tự nhận diện nó. Trong Railway Dashboard, tạo **New Project** → **Deploy from GitHub repo** → chọn `k22lhquy/youtubeMul` → **Deploy Now**. Sau khi build xong, vào service settings và chọn **Generate Domain**.
 
-Railway tự deploy lại mỗi khi có commit mới trên `main`. Không cần biến môi trường ngoài `PORT`, vì Railway tự cấp giá trị này.
+Railway tự deploy lại mỗi khi có commit mới trên `main`. Railway tự cấp `PORT`; thêm `JWT_SECRET` ngẫu nhiên khi deploy production.
 
 ## Kiểm tra
 
@@ -53,5 +71,5 @@ Test hiện có xác nhận host sync seek đến guest và quyền host đượ
 
 ## Giới hạn hiện tại
 
-- Chưa có đăng nhập, chat, upload hay lịch sử phòng.
+- Chưa có tài khoản/password, chat, upload hay lịch sử phòng.
 - Chỉ dùng video bạn có quyền chia sẻ; không rehost hoặc vượt điều khoản nguồn video.

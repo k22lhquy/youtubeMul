@@ -5,15 +5,23 @@
   "description": "A minimal synchronized watch-party room.",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "dev": "vite --config client/vite.config.js",
+    "build": "vite build --config client/vite.config.js",
     "test": "node --test"
   },
   "dependencies": {
     "express": "^5.2.1",
     "hls.js": "^1.7.3",
+    "jsonwebtoken": "^9.0.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.3"
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "socket.io-client": "^4.8.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0"
   }
 }

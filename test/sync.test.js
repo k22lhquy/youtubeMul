@@ -21,17 +21,25 @@ test("host seek synchronizes and host role transfers", async (t) => {
   });
 
   const url = `http://127.0.0.1:${port}`;
-  const host = io(url, { transports: ["websocket"] });
-  const guest = io(url, { transports: ["websocket"] });
+  const tokenFor = async (name) => {
+    const response = await fetch(`${url}/api/auth/guest`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()).token;
+  };
+  const [hostToken, guestToken] = await Promise.all([tokenFor("Host"), tokenFor("Guest")]);
+  const host = io(url, { auth: { token: hostToken }, transports: ["websocket"] });
+  const guest = io(url, { auth: { token: guestToken }, transports: ["websocket"] });
   t.after(() => host.close());
   t.after(() => guest.close());
   await Promise.all([waitFor(host, "connect"), waitFor(guest, "connect")]);
 
   const hostRoom = await new Promise((resolve) => host.emit("join-room", {
-    roomId: "TEST-ROOM", name: "Host", videoUrl: "https://example.com/movie.mp4",
+    roomId: "TEST-ROOM", videoUrl: "https://example.com/movie.mp4",
   }, resolve));
   const guestRoom = await new Promise((resolve) => guest.emit("join-room", {
-    roomId: "TEST-ROOM", name: "Guest",
+    roomId: "TEST-ROOM",
   }, resolve));
   assert.equal(hostRoom.isHost, true);
   assert.equal(guestRoom.isHost, false);

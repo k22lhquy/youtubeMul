@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme { --color-ink: #101828; --color-brand: #7c3aed; }
+
+body { @apply m-0 min-w-80 bg-slate-950 font-sans text-slate-100; }
+input { @apply w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white outline-none focus:border-violet-400; }
+button { @apply rounded-lg bg-violet-600 px-4 py-2 font-semibold text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50; }
