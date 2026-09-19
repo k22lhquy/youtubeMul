@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SyncScreen — xem cùng nhau</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <section class="hero" id="lobby">
+        <p class="eyebrow">SYNCED WATCH PARTY</p>
+        <h1>Xem cùng một khoảnh khắc.</h1>
+        <p class="lede">Tạo phòng, gửi link, cùng xem video. Bản đầu dùng URL video công khai.</p>
+        <form id="room-form" class="card">
+          <label>
+            Tên hiển thị
+            <input id="name" maxlength="32" placeholder="Quy" required />
+          </label>
+          <label>
+            URL video MP4/HLS
+            <input id="video-url" type="url" placeholder="https://.../movie.mp4" required />
+          </label>
+          <button>Tạo phòng</button>
+        </form>
+      </section>
+
+      <section class="watch hidden" id="watch-room" aria-live="polite">
+        <header class="topbar">
+          <a class="brand" href="/">SYNCSCREEN</a>
+          <span id="room-code"></span>
+          <button class="copy" id="copy-link" type="button">Sao chép link mời</button>
+        </header>
+        <div class="stage">
+          <video id="player" controls playsinline></video>
+          <aside>
+            <span class="status"><i></i> Sẵn sàng đồng bộ</span>
+            <h2 id="movie-title">Video của phòng</h2>
+            <p>Phần đồng bộ thời gian sẽ được kết nối ở task tiếp theo.</p>
+            <div class="people"><strong>1</strong> người trong phòng</div>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
