@@ -11,3 +11,9 @@ export const guestToken = async (name) => (await request("/api/auth/guest", json
 export const register = (values) => request("/api/auth/register", json(values));
 export const login = (values) => request("/api/auth/login", json(values));
 export const roomHistory = (token) => request("/api/rooms", { headers: { Authorization: `Bearer ${token}` } });
+export async function uploadVideo(token, file) {
+  const response = await fetch("/api/videos", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": file.type, "X-File-Name": encodeURIComponent(file.name) }, body: file });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "Upload video thất bại.");
+  return body.url;
+}

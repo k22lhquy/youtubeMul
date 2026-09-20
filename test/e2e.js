@@ -1,7 +1,6 @@
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
-const http = require("node:http");
 const path = require("node:path");
 const test = require("node:test");
 const { chromium } = require("playwright-core");
@@ -29,13 +28,6 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   });
 
   const video = Buffer.from(fs.readFileSync(path.join(__dirname, "fixtures", "video.webm.base64"), "utf8"), "base64");
-  const media = http.createServer((_, response) => {
-    response.writeHead(200, { "Content-Type": "video/webm", "Content-Length": video.length, "Access-Control-Allow-Origin": "*" });
-    response.end(video);
-  });
-  await new Promise((resolve) => media.listen(0, "127.0.0.1", resolve));
-  t.after(() => media.close());
-  const mediaUrl = `http://127.0.0.1:${media.address().port}/video.webm`;
 
   const browser = await chromium.launch({ executablePath: edge, headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
   t.after(() => browser.close());
@@ -45,7 +37,11 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   const guestName = `E2E Guest ${suffix}`;
   let roomCode;
   t.after(async () => {
-    if (roomCode) await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
+    if (roomCode) {
+      const { rows } = await db.query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
+      await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
+      if (rows[0]?.video_url.startsWith("/uploads/")) await fs.promises.rm(path.join(root, rows[0].video_url.replace(/^\//, "")), { force: true });
+    }
     await db.query("DELETE FROM users WHERE name = ANY($1::text[])", [[hostName, guestName]]);
     await db.end();
   });
@@ -57,7 +53,7 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
 
   await host.goto(`http://127.0.0.1:${port}`);
   await host.locator('input[placeholder="Quy"]').fill(hostName);
-  await host.locator('input[type="url"]').fill(mediaUrl);
+  await host.getByLabel("Upload video").setInputFiles({ name: "e2e.webm", mimeType: "video/webm", buffer: video });
   await host.getByRole("button", { name: "Tạo phòng" }).click();
   await host.waitForURL(/#.+/);
   roomCode = host.url().split("#")[1];

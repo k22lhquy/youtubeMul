@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("node:path");
 const authRoutes = require("./routes/auth.routes");
 const roomRoutes = require("./routes/room.routes");
+const videoRoutes = require("./routes/video.routes");
 const db = require("./config/database");
 
 const app = express();
@@ -14,6 +15,8 @@ app.get("/api/health", async (_, res) => {
 });
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
+app.use("/api/videos", videoRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads"), { dotfiles: "deny" }));
 app.use(express.static(clientDist));
 app.get("*splat", (_, res) => res.sendFile(path.join(clientDist, "index.html")));
 

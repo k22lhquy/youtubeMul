@@ -4,6 +4,7 @@ const messages = require("../models/message.model");
 const now = () => Date.now();
 const roomId = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32);
 const validVideoUrl = (value) => {
+  if (/^\/uploads\/[a-f0-9-]+\.(?:mp4|webm|ogg)$/i.test(value)) return true;
   try { return ["http:", "https:"].includes(new URL(value).protocol); } catch { return false; }
 };
 const positionAt = (state, timestamp = now()) => state.playing ? state.position + (timestamp - state.changedAt) / 1000 : state.position;

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { guestToken } from "../api";
+import { guestToken, uploadVideo } from "../api";
 
 export function useWatchRoom(playerRef) {
   const socketRef = useRef();
   const applyingRef = useRef(0);
   const clockOffset = useRef(0);
+  const tokenRef = useRef();
   const [room, setRoom] = useState();
   const [status, setStatus] = useState("Sẵn sàng tạo phòng");
   const [error, setError] = useState("");
@@ -43,10 +44,12 @@ export function useWatchRoom(playerRef) {
     return () => window.clearInterval(timer);
   }, [room, syncPlayback]);
 
-  const join = useCallback(async ({ name, token, roomId, videoUrl }) => {
+  const join = useCallback(async ({ name, token, roomId, videoUrl, videoFile }) => {
     setError(""); setStatus("Đang kết nối…");
     try {
       const authToken = token || await guestToken(name);
+      tokenRef.current = authToken;
+      if (videoFile) { setStatus("Đang upload video…"); videoUrl = await uploadVideo(authToken, videoFile); }
       const socket = io({ auth: { token: authToken } });
       socketRef.current = socket;
       socket.on("room-state", (next) => { setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); });
@@ -71,5 +74,6 @@ export function useWatchRoom(playerRef) {
 
   const control = useCallback((name, extra = {}) => action(name, extra, true), [action]);
   const sendChat = useCallback((content) => socketRef.current?.emit("chat-message", content, (result) => result.error && setError(result.error)), []);
-  return { room, status, error, messages, join, action, control, sendChat, syncPlayback, reportError: setError };
+  const uploadAndLoad = useCallback(async (file) => { try { setStatus("Đang upload video…"); control("load", { videoUrl: await uploadVideo(tokenRef.current, file) }); } catch (err) { setError(err.message); } }, [control]);
+  return { room, status, error, messages, join, action, control, sendChat, uploadAndLoad, syncPlayback, reportError: setError };
 }

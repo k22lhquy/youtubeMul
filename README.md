@@ -48,7 +48,7 @@ Database local chạy bằng Docker Compose tại `127.0.0.1:5432`. Cấu hình 
 
 ## Video và production
 
-Ứng dụng **không truyền file video qua Socket.IO**. Mỗi người xem tải video trực tiếp từ nguồn URL. Để ít giật:
+Video upload local đi qua HTTP streaming, tối đa 1 GB và được lưu trong `uploads/`; Socket.IO chỉ đồng bộ điều khiển. Mỗi người xem tải video trực tiếp từ URL. Để ít giật:
 
 - Lưu video ở object storage và phân phối qua CDN.
 - Transcode sang HLS nhiều bitrate.
@@ -73,5 +73,4 @@ Test hiện có xác nhận mọi thành viên đều có thể sync seek đến
 
 ## Giới hạn hiện tại
 
-- Chưa có upload video local.
 - Chỉ dùng video bạn có quyền chia sẻ; không rehost hoặc vượt điều khoản nguồn video.
