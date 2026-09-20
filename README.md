@@ -73,5 +73,5 @@ Test hiện có xác nhận mọi thành viên đều có thể sync seek đến
 
 ## Giới hạn hiện tại
 
-- Chưa có chat hay upload video local.
+- Chưa có upload video local.
 - Chỉ dùng video bạn có quyền chia sẻ; không rehost hoặc vượt điều khoản nguồn video.

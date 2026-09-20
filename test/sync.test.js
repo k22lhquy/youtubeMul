@@ -67,5 +67,11 @@ test("every member can synchronize playback", async (t) => {
   const persisted = await db.query("SELECT position FROM rooms WHERE code = $1", [roomCode]);
   assert.equal(persisted.rows[0].position, 42);
 
+  const incomingMessage = waitFor(host, "chat-message");
+  guest.emit("chat-message", "xin chào");
+  assert.equal((await incomingMessage).content, "xin chào");
+  const persistedMessage = await db.query("SELECT content FROM messages WHERE room_code = $1", [roomCode]);
+  assert.equal(persistedMessage.rows[0].content, "xin chào");
+
   assert.deepEqual(update.members.map(({ name }) => name).sort(), ["Test Guest", "Test Host"]);
 });

@@ -23,3 +23,14 @@ CREATE TABLE IF NOT EXISTS rooms (
 
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS rooms_owner_updated_idx ON rooms (owner_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id BIGSERIAL PRIMARY KEY,
+  room_code VARCHAR(32) NOT NULL REFERENCES rooms(code) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  name VARCHAR(32) NOT NULL,
+  content VARCHAR(500) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS messages_room_created_idx ON messages (room_code, created_at DESC);

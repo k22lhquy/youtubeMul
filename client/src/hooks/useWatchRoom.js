@@ -9,6 +9,7 @@ export function useWatchRoom(playerRef) {
   const [room, setRoom] = useState();
   const [status, setStatus] = useState("Sẵn sàng tạo phòng");
   const [error, setError] = useState("");
+  const [messages, setMessages] = useState([]);
 
   const expectedPosition = useCallback((next = room) => {
     if (!next) return 0;
@@ -50,6 +51,8 @@ export function useWatchRoom(playerRef) {
       socketRef.current = socket;
       socket.on("room-state", (next) => { setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); });
       socket.on("room-error", setError);
+      socket.on("chat-history", setMessages);
+      socket.on("chat-message", (message) => setMessages((current) => [...current, message].slice(-50)));
       socket.on("connect_error", () => setError("Phiên đăng nhập không hợp lệ hoặc server không phản hồi."));
       socket.on("disconnect", () => setStatus("Mất kết nối, đang thử lại…"));
       socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl }, (next) => {
@@ -67,5 +70,6 @@ export function useWatchRoom(playerRef) {
   }, [expectedPosition, playerRef, room]);
 
   const control = useCallback((name, extra = {}) => action(name, extra, true), [action]);
-  return { room, status, error, join, action, control, syncPlayback, reportError: setError };
+  const sendChat = useCallback((content) => socketRef.current?.emit("chat-message", content, (result) => result.error && setError(result.error)), []);
+  return { room, status, error, messages, join, action, control, sendChat, syncPlayback, reportError: setError };
 }

@@ -1,4 +1,5 @@
 const rooms = require("../models/room.model");
+const messages = require("../models/message.model");
 
 const now = () => Date.now();
 const roomId = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32);
@@ -33,9 +34,25 @@ function registerRoomSocket(io) {
         room.members.set(socket.id, { id: socket.id, name: socket.data.user.name });
         reply(snapshot(room));
         broadcast(io, room);
+        socket.emit("chat-history", await messages.list(id));
       } catch (error) {
         console.error(error);
         reply({ error: "Database chưa sẵn sàng." });
+      }
+    });
+
+    socket.on("chat-message", async (value, reply = () => {}) => {
+      try {
+        const room = await rooms.get(socket.data.roomId);
+        if (!room?.members.has(socket.id)) return reply({ error: "Bạn chưa tham gia phòng." });
+        const content = String(value || "").trim().slice(0, 500);
+        if (!content) return reply({ error: "Tin nhắn trống." });
+        const message = await messages.create(room.id, socket.data.user, content);
+        io.to(room.id).emit("chat-message", message);
+        reply({ ok: true });
+      } catch (error) {
+        console.error(error);
+        reply({ error: "Không gửi được tin nhắn." });
       }
     });
 

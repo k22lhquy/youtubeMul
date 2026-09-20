@@ -73,6 +73,10 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   await waitUntil(() => guest.locator("video").evaluate((video) => video.readyState >= 1));
   await waitUntil(() => guest.locator("video").evaluate((video) => !video.paused && video.currentTime > 0));
 
+  await guest.getByLabel("Tin nhắn").fill("xin chào từ guest");
+  await guest.getByRole("button", { name: "Gửi" }).click();
+  await host.getByText("xin chào từ guest").waitFor();
+
   const [hostTime, guestTime] = await Promise.all([
     host.locator("video").evaluate((video) => video.currentTime),
     guest.locator("video").evaluate((video) => video.currentTime),
