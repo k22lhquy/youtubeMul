@@ -1,5 +1,8 @@
 const rooms = require("../models/room.model");
 const messages = require("../models/message.model");
+const jwt = require("jsonwebtoken");
+const { hashPassword, passwordMatches } = require("./auth.controller");
+const { jwtSecret } = require("../config/env");
 
 const now = () => Date.now();
 const roomId = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32);
@@ -8,10 +11,15 @@ const validVideoUrl = (value) => {
   try { return ["http:", "https:"].includes(new URL(value).protocol); } catch { return false; }
 };
 const positionAt = (state, timestamp = now()) => state.playing ? state.position + (timestamp - state.changedAt) / 1000 : state.position;
+const inviteFor = (id) => jwt.sign({ roomId: id, scope: "room-invite" }, jwtSecret);
+const validInvite = (token, id) => {
+  try { const payload = jwt.verify(token, jwtSecret); return payload.scope === "room-invite" && payload.roomId === id; }
+  catch { return false; }
+};
 
 function snapshot(room, socketId) {
   return {
-    roomId: room.id, state: room.state, serverNow: now(), hostId: room.hostId, selfId: socketId, isHost: room.hostId === socketId,
+    roomId: room.id, inviteToken: room.inviteToken, state: room.state, serverNow: now(), hostId: room.hostId, selfId: socketId, isHost: room.hostId === socketId,
     members: [...room.members.values()].map(({ id, name }) => ({ id, name, isHost: id === room.hostId })),
   };
 }
@@ -22,14 +30,19 @@ function broadcast(io, room) {
 
 function registerRoomSocket(io) {
   io.on("connection", (socket) => {
-    socket.on("join-room", async ({ roomId: rawId, videoUrl }, reply = () => {}) => {
+    socket.on("join-room", async ({ roomId: rawId, videoUrl, password: rawPassword, inviteToken }, reply = () => {}) => {
       const id = roomId(rawId);
+      const password = String(rawPassword || "");
       if (!id) return reply({ error: "Mã phòng không hợp lệ." });
       try {
         let room = await rooms.get(id);
         if (!room) {
           if (!validVideoUrl(videoUrl)) return reply({ error: "Cần nhập URL video HTTP(S) để tạo phòng." });
-          room = await rooms.create({ id, ownerId: socket.data.user.guest ? null : socket.data.user.sub, hostId: socket.id, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
+          if (password && (password.length < 4 || password.length > 128)) return reply({ error: "Mật khẩu phòng phải từ 4 đến 128 ký tự." });
+          room = await rooms.create({ id, ownerId: socket.data.user.sub, hostId: socket.id, inviteToken: inviteFor(id), passwordHash: password ? await hashPassword(password) : null, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
+        } else {
+          room.inviteToken ||= inviteFor(id);
+          if (room.passwordHash && room.ownerId !== socket.data.user.sub && !validInvite(inviteToken, id) && !(await passwordMatches(password, room.passwordHash))) return reply({ error: "Mật khẩu phòng không đúng." });
         }
         if (!room.hostId) room.hostId = socket.id;
         socket.join(id);
@@ -77,7 +90,7 @@ function registerRoomSocket(io) {
     socket.on("room-action", async ({ action, position, videoUrl }) => {
       try {
         const room = await rooms.get(socket.data.roomId);
-        if (!room || room.hostId !== socket.id) return socket.emit("room-error", "Chỉ host được điều khiển video.");
+        if (!room?.members.has(socket.id)) return socket.emit("room-error", "Bạn chưa tham gia phòng.");
         const timestamp = now();
         const currentPosition = Math.max(0, positionAt(room.state, timestamp));
         if (action === "load" && validVideoUrl(videoUrl)) room.state = { videoUrl, playing: false, position: 0, changedAt: timestamp, version: room.state.version + 1 };
@@ -115,7 +128,6 @@ function registerRoomSocket(io) {
 }
 
 async function roomHistory(req, res) {
-  if (req.user.guest) return res.status(403).json({ error: "Cần tài khoản để xem lịch sử phòng." });
   res.json({ rooms: await rooms.history(req.user.sub) });
 }
 

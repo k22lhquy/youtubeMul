@@ -10,6 +10,14 @@ const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 const videoUrl = process.env.E2E_YOUTUBE_URL || "https://www.youtube.com/watch?v=M7lc1UVf-VE";
 const videoId = new URL(videoUrl).searchParams.get("v");
 
+async function register(page, name, email) {
+  await page.getByRole("button", { name: "Đăng ký" }).click();
+  await page.locator('input[name="name"]').fill(name);
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill("correct-horse");
+  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+}
+
 test("YouTube URL loads and synchronizes play state", async (t) => {
   const port = 3900 + Math.floor(Math.random() * 90);
   const app = spawn(process.execPath, ["server.js"], { cwd: root, env: { ...process.env, PORT: String(port) } });
@@ -24,12 +32,13 @@ test("YouTube URL loads and synchronizes play state", async (t) => {
   const db = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://syncscreen:syncscreen-local@127.0.0.1:5432/syncscreen" });
   const suffix = Date.now();
   const hostName = `YouTube Host ${suffix}`;
+  const guestName = `YouTube Guest ${suffix}`;
+  const hostEmail = `youtube-host-${suffix}@example.com`;
+  const guestEmail = `youtube-guest-${suffix}@example.com`;
   let roomCode;
-  let guestId;
   t.after(async () => {
     if (roomCode) await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
-    await db.query("DELETE FROM users WHERE name = $1", [hostName]);
-    if (guestId) await db.query("DELETE FROM users WHERE id = $1", [guestId]);
+    await db.query("DELETE FROM users WHERE email = ANY($1::text[])", [[hostEmail, guestEmail]]);
     await db.end();
   });
 
@@ -39,11 +48,12 @@ test("YouTube URL loads and synchronizes play state", async (t) => {
   host.on("pageerror", (error) => errors.push(`host: ${error.message}`));
   guest.on("pageerror", (error) => errors.push(`guest: ${error.message}`));
   await host.goto(`http://127.0.0.1:${port}`);
-  await host.locator('input[placeholder="Quy"]').fill(hostName);
+  await register(host, hostName, hostEmail);
   await host.locator('input[type="url"]').fill(videoUrl);
-  await host.getByRole("button", { name: "Tạo phòng" }).click();
+  await host.getByRole("button", { name: "Tạo host" }).click();
   await host.waitForURL(/#.+/);
   roomCode = host.url().split("#")[1];
+  const inviteUrl = await host.getByLabel("Link mời").inputValue();
   await host.locator(`iframe[src*="youtube.com/embed/${videoId}"]`).waitFor({ timeout: 20_000 });
   await host.getByRole("button", { name: "Phát", exact: true }).click();
   try {
@@ -54,9 +64,8 @@ test("YouTube URL loads and synchronizes play state", async (t) => {
   }
   await host.getByText("Đang phát đồng bộ").waitFor();
 
-  const guestAuth = guest.waitForResponse((response) => response.url().endsWith("/api/auth/guest"));
-  await guest.goto(host.url());
-  guestId = (await (await guestAuth).json()).user.id;
+  await guest.goto(inviteUrl);
+  await register(guest, guestName, guestEmail);
   await guest.locator(`iframe[src*="youtube.com/embed/${videoId}"]`).waitFor({ timeout: 20_000 });
   await guest.getByText("Đang phát đồng bộ").waitFor();
   await guest.locator('iframe[data-player-state="1"]').waitFor({ timeout: 20_000 });

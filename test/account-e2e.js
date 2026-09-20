@@ -25,9 +25,9 @@ test("registers in the UI and creates a room with the account JWT", async (t) =>
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("correct-horse");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByText("Đã đăng nhập: UI Account").waitFor();
+  await page.getByText("Tạo host mới").waitFor();
   await page.locator('input[type="url"]').fill("https://example.com/movie.mp4");
-  await page.getByRole("button", { name: "Tạo phòng" }).click();
+  await page.getByRole("button", { name: "Tạo host" }).click();
   await page.waitForURL(/#.+/);
   roomCode = page.url().split("#")[1];
   assert.match(await page.locator("body").innerText(), /UI Account \(host\)/);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { guestToken, uploadVideo } from "../api";
+import { uploadVideo } from "../api";
 
 export function useWatchRoom(playerRef) {
   const socketRef = useRef();
@@ -23,7 +23,7 @@ export function useWatchRoom(playerRef) {
     const drift = expectedPosition(next) - player.currentTime;
     applyingRef.current = Date.now() + 700;
     if (Math.abs(drift) > 1 || (Math.abs(drift) > 0.25 && player.canNudge === false)) player.currentTime = expectedPosition(next);
-    else if (Math.abs(drift) > 0.25 && !next.isHost) {
+    else if (Math.abs(drift) > 0.25) {
       player.playbackRate = drift > 0 ? 1.04 : 0.96;
       window.setTimeout(() => { player.playbackRate = 1; }, 1800);
     }
@@ -40,18 +40,20 @@ export function useWatchRoom(playerRef) {
       const sentAt = Date.now();
       socket.emit("clock-ping", null, (serverNow) => {
         clockOffset.current = serverNow - (sentAt + Date.now()) / 2;
-        if (room && !room.isHost) syncPlayback();
+        if (room) syncPlayback();
       });
     }, 5000);
     return () => window.clearInterval(timer);
   }, [room, syncPlayback]);
 
-  const join = useCallback(async ({ name, token, roomId, videoUrl, videoFile }) => {
+  const join = useCallback(async ({ token, roomId, videoUrl, videoFile, password, inviteToken }) => {
     setError(""); setStatus("Đang kết nối…");
     try {
-      const authToken = token || await guestToken(name);
+      if (!token) throw new Error("Bạn phải đăng nhập trước.");
+      const authToken = token;
       tokenRef.current = authToken;
       if (videoFile) { setStatus("Đang upload video…"); videoUrl = await uploadVideo(authToken, videoFile); }
+      socketRef.current?.close();
       const socket = io({ auth: { token: authToken } });
       socketRef.current = socket;
       const receiveRoom = (next) => { clockOffset.current = next.serverNow - Date.now(); setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); };
@@ -61,7 +63,7 @@ export function useWatchRoom(playerRef) {
       socket.on("chat-message", (message) => setMessages((current) => [...current, message].slice(-50)));
       socket.on("connect_error", () => setError("Phiên đăng nhập không hợp lệ hoặc server không phản hồi."));
       socket.on("disconnect", () => setStatus("Mất kết nối, đang thử lại…"));
-      socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl }, (next) => {
+      socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl, password, inviteToken }, (next) => {
         if (next.error) return setError(next.error);
         history.replaceState({}, "", `/#${next.roomId}`);
         receiveRoom(next);
@@ -71,7 +73,7 @@ export function useWatchRoom(playerRef) {
 
   const action = useCallback((action, extra = {}, force = false) => {
     const player = playerRef.current;
-    if (!room?.isHost || (!force && (!player || Date.now() < applyingRef.current))) return;
+    if (!room || (!force && (!player || Date.now() < applyingRef.current))) return;
     socketRef.current?.emit("room-action", { action, position: player?.currentTime ?? expectedPosition(), ...extra });
   }, [expectedPosition, playerRef, room]);
 

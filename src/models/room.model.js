@@ -8,15 +8,15 @@ class RoomStore {
     const { rows } = await db.query("SELECT * FROM rooms WHERE code = $1", [id]);
     if (!rows[0]) return undefined;
     const row = rows[0];
-    const room = { id, hostId: null, members: new Map(), state: { videoUrl: row.video_url, playing: row.playing, position: row.position, changedAt: Number(row.changed_at), version: row.version } };
+    const room = { id, ownerId: row.owner_id, hostId: null, passwordHash: row.password_hash, members: new Map(), state: { videoUrl: row.video_url, playing: row.playing, position: row.position, changedAt: Number(row.changed_at), version: row.version } };
     this.rooms.set(id, room);
     return room;
   }
 
   async create(room) {
     await db.query(
-      "INSERT INTO rooms (code, owner_id, video_url, playing, position, changed_at, version) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [room.id, room.ownerId, room.state.videoUrl, room.state.playing, room.state.position, room.state.changedAt, room.state.version],
+      "INSERT INTO rooms (code, owner_id, password_hash, video_url, playing, position, changed_at, version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [room.id, room.ownerId, room.passwordHash, room.state.videoUrl, room.state.playing, room.state.position, room.state.changedAt, room.state.version],
     );
     this.rooms.set(room.id, room);
     return room;

@@ -13,7 +13,7 @@ test("uploads and serves a local video", async (t) => {
   await new Promise((resolve, reject) => { app.stdout.on("data", (data) => data.toString().includes("running at") && resolve()); app.once("error", reject); });
 
   const base = `http://127.0.0.1:${port}`;
-  const authResponse = await fetch(`${base}/api/auth/guest`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Upload Test" }) });
+  const authResponse = await fetch(`${base}/api/auth/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Upload Test", email: `upload-${Date.now()}@example.com`, password: "correct-horse" }) });
   const auth = await authResponse.json();
   const video = Buffer.from(fs.readFileSync(path.join(__dirname, "fixtures", "video.webm.base64"), "utf8"), "base64");
   const response = await fetch(`${base}/api/videos`, { method: "POST", headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "video/webm", "X-File-Name": "test.webm" }, body: video });

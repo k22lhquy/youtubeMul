@@ -18,6 +18,14 @@ async function waitUntil(check, timeout = 15_000) {
   throw new Error("Timed out waiting for browser state");
 }
 
+async function register(page, name, email) {
+  await page.getByRole("button", { name: "Đăng ký" }).click();
+  await page.locator('input[name="name"]').fill(name);
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill("correct-horse");
+  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+}
+
 test("host plays, guest joins, and playback stays synchronized", async (t) => {
   const port = 3800 + Math.floor(Math.random() * 100);
   const app = spawn(process.execPath, ["server.js"], { cwd: root, env: { ...process.env, PORT: String(port) } });
@@ -35,33 +43,38 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   const suffix = Date.now();
   const hostName = `E2E Host ${suffix}`;
   const guestName = `E2E Guest ${suffix}`;
+  const joinerName = `E2E Joiner ${suffix}`;
+  const hostEmail = `host-${suffix}@example.com`;
+  const guestEmail = `guest-${suffix}@example.com`;
+  const joinerEmail = `joiner-${suffix}@example.com`;
   let roomCode;
-  let guestId;
   t.after(async () => {
     if (roomCode) {
       const { rows } = await db.query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
       await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
       if (rows[0]?.video_url.startsWith("/uploads/")) await fs.promises.rm(path.join(root, rows[0].video_url.replace(/^\//, "")), { force: true });
     }
-    await db.query("DELETE FROM users WHERE name = $1", [hostName]);
-    if (guestId) await db.query("DELETE FROM users WHERE id = $1", [guestId]);
+    await db.query("DELETE FROM users WHERE email = ANY($1::text[])", [[hostEmail, guestEmail, joinerEmail]]);
     await db.end();
   });
   const host = await browser.newPage();
   const guest = await browser.newPage();
+  const joiner = await browser.newPage();
   await guest.addInitScript(() => { const now = Date.now; Date.now = () => now() + 60_000; });
   const errors = [];
   host.on("pageerror", (error) => errors.push(`host: ${error.message}`));
   guest.on("pageerror", (error) => errors.push(`guest: ${error.message}`));
+  joiner.on("pageerror", (error) => errors.push(`joiner: ${error.message}`));
 
   await host.goto(`http://127.0.0.1:${port}`);
-  await host.locator('input[placeholder="Quy"]').fill(hostName);
+  await register(host, hostName, hostEmail);
   await host.getByLabel("Upload video").setInputFiles({ name: "e2e.webm", mimeType: "video/webm", buffer: video });
-  await host.getByRole("button", { name: "Tạo phòng" }).click();
+  await host.getByLabel("Mật khẩu host (không bắt buộc)").fill("room-secret");
+  await host.getByRole("button", { name: "Tạo host" }).click();
   await host.waitForURL(/#.+/);
   roomCode = host.url().split("#")[1];
-  const inviteUrl = `http://127.0.0.1:${port}/#${roomCode}`;
-  assert.equal(await host.getByLabel("Link mời").inputValue(), inviteUrl);
+  const inviteUrl = await host.getByLabel("Link mời").inputValue();
+  assert.match(inviteUrl, new RegExp(`^http://127.0.0.1:${port}/#${roomCode}\\?invite=.+`));
   await host.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
     document.execCommand = () => {
@@ -76,15 +89,27 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   await host.getByRole("button", { name: "Phát", exact: true }).click();
   await waitUntil(() => host.locator("video").evaluate((video) => video.currentTime > 0.5));
 
-  const guestAuth = guest.waitForResponse((response) => response.url().endsWith("/api/auth/guest"));
-  await guest.goto(host.url());
-  guestId = (await (await guestAuth).json()).user.id;
+  await joiner.goto(`http://127.0.0.1:${port}`);
+  await register(joiner, joinerName, joinerEmail);
+  await joiner.getByLabel("Mã host").fill(roomCode);
+  await joiner.getByLabel("Mật khẩu host", { exact: true }).fill("wrong");
+  await joiner.getByRole("button", { name: "Vào host" }).click();
+  await joiner.getByText("Mật khẩu phòng không đúng.").waitFor();
+  await joiner.getByLabel("Mật khẩu host", { exact: true }).fill("room-secret");
+  await joiner.getByRole("button", { name: "Vào host" }).click();
+  await joiner.locator("video").waitFor();
+
+  await guest.goto(inviteUrl);
+  await register(guest, guestName, guestEmail);
   await guest.locator("video").waitFor();
   await waitUntil(() => guest.locator("video").evaluate((video) => video.readyState >= 1));
   await waitUntil(() => guest.locator("video").evaluate((video) => !video.paused && video.currentTime > 0));
-  await guest.getByLabel("Tên hiển thị").fill(guestName);
-  await guest.getByRole("button", { name: "Đổi tên" }).click();
   await host.getByText(new RegExp(guestName)).waitFor();
+
+  await guest.getByRole("button", { name: "Tạm dừng", exact: true }).click();
+  await waitUntil(() => host.locator("video").evaluate((video) => video.paused));
+  await guest.getByRole("button", { name: "Phát", exact: true }).click();
+  await waitUntil(() => host.locator("video").evaluate((video) => !video.paused));
 
   await guest.getByLabel("Tin nhắn").fill("xin chào từ guest");
   await guest.getByRole("button", { name: "Gửi" }).click();

@@ -19,6 +19,7 @@ test("registers, rejects duplicate email, and logs in", async (t) => {
   const email = `account-${Date.now()}@example.com`;
   const body = { name: "Account Test", email, password: "correct-horse" };
   const post = (route, data) => fetch(`http://127.0.0.1:${port}/api/auth/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  assert.equal((await post("guest", { name: "Guest" })).status, 404);
   const created = await post("register", body);
   assert.equal(created.status, 201);
   const session = await created.json();

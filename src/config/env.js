@@ -5,5 +5,6 @@ if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
 }
 
 const jwtSecret = process.env.JWT_SECRET || "local-development-secret-change-before-production";
+const googleClientId = process.env.GOOGLE_CLIENT_ID || "";
 
-module.exports = { port, jwtSecret, databaseUrl };
+module.exports = { port, jwtSecret, databaseUrl, googleClientId };

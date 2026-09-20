@@ -1,11 +1,13 @@
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 const { randomBytes, randomUUID, scrypt, timingSafeEqual } = require("node:crypto");
 const { promisify } = require("node:util");
-const { jwtSecret } = require("../config/env");
+const { googleClientId, jwtSecret } = require("../config/env");
 const db = require("../config/database");
 const scryptAsync = promisify(scrypt);
+const google = googleClientId ? new OAuth2Client(googleClientId) : null;
 
-const tokenFor = (user, guest = false) => jwt.sign({ sub: user.id, name: user.name, email: user.email, guest }, jwtSecret, { expiresIn: guest ? "24h" : "7d" });
+const tokenFor = (user) => jwt.sign({ sub: user.id, name: user.name, email: user.email }, jwtSecret, { expiresIn: "7d" });
 const publicUser = ({ id, name, email }) => ({ id, name, email });
 
 async function hashPassword(password) {
@@ -30,17 +32,24 @@ function credentials(body) {
   };
 }
 
-async function createGuestToken(req, res) {
-  const name = String(req.body?.name || "").trim().slice(0, 32);
-  if (!name) return res.status(400).json({ error: "Tên hiển thị là bắt buộc." });
+async function loginWithGoogle(req, res) {
+  if (!google) return res.status(503).json({ error: "Đăng nhập Google chưa được cấu hình." });
   try {
-    const id = randomUUID();
-    await db.query("INSERT INTO users (id, name) VALUES ($1, $2)", [id, name]);
-    const user = { id, name };
-    res.json({ token: tokenFor(user, true), user });
-  } catch (error) {
-    console.error(error);
-    res.status(503).json({ error: "Database chưa sẵn sàng." });
+    const ticket = await google.verifyIdToken({ idToken: req.body?.credential, audience: googleClientId });
+    const { sub, email, email_verified: verified, name: googleName } = ticket.getPayload();
+    if (!verified || !email) return res.status(401).json({ error: "Tài khoản Google chưa xác minh email." });
+    const name = String(googleName || email.split("@")[0]).trim().slice(0, 32);
+    const existing = await db.query("SELECT id FROM users WHERE google_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1", [sub, email]);
+    const id = existing.rows[0]?.id || randomUUID();
+    const { rows } = await db.query(
+      `INSERT INTO users (id, name, email, google_sub) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, google_sub = EXCLUDED.google_sub
+       RETURNING id, name, email`,
+      [id, name, email, sub],
+    );
+    res.json({ token: tokenFor(rows[0]), user: publicUser(rows[0]) });
+  } catch {
+    res.status(401).json({ error: "Đăng nhập Google không hợp lệ." });
   }
 }
 
@@ -74,4 +83,6 @@ function me(req, res) {
   res.json({ user: publicUser({ id: req.user.sub, name: req.user.name, email: req.user.email }) });
 }
 
-module.exports = { createGuestToken, register, login, me };
+const config = (_, res) => res.json({ googleClientId });
+
+module.exports = { register, login, loginWithGoogle, config, me, hashPassword, passwordMatches };

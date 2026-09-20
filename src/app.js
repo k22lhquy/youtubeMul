@@ -8,6 +8,7 @@ const db = require("./config/database");
 const app = express();
 const clientDist = path.join(__dirname, "..", "client", "dist");
 
+app.use((_, res, next) => { res.set("Referrer-Policy", "no-referrer-when-downgrade"); next(); });
 app.use(express.json());
 app.get("/api/health", async (_, res) => {
   try { await db.query("SELECT 1"); res.json({ ok: true, database: "connected" }); }

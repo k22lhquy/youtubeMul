@@ -8,7 +8,7 @@ const { Pool } = require("pg");
 const root = path.join(__dirname, "..");
 const waitFor = (emitter, event) => new Promise((resolve) => emitter.once(event, resolve));
 
-test("host seek synchronizes and host role transfers", async (t) => {
+test("members synchronize through a password-protected room", async (t) => {
   const port = 3400 + Math.floor(Math.random() * 400);
   const app = spawn(process.execPath, ["server.js"], {
     cwd: root,
@@ -25,10 +25,10 @@ test("host seek synchronizes and host role transfers", async (t) => {
   const roomCode = `TEST-${Date.now()}`;
   const db = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://syncscreen:syncscreen-local@127.0.0.1:5432/syncscreen" });
   const tokenFor = async (name) => {
-    const response = await fetch(`${url}/api/auth/guest`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    const response = await fetch(`${url}/api/auth/register`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, email: `${name.replaceAll(" ", "-")}-${roomCode}@example.com`, password: "correct-horse" }),
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 201);
     return response.json();
   };
   const [hostAuth, guestAuth] = await Promise.all([tokenFor("Test Host"), tokenFor("Test Guest")]);
@@ -44,10 +44,15 @@ test("host seek synchronizes and host role transfers", async (t) => {
   await Promise.all([waitFor(host, "connect"), waitFor(guest, "connect")]);
 
   const hostRoom = await new Promise((resolve) => host.emit("join-room", {
-    roomId: roomCode, videoUrl: "https://example.com/movie.mp4",
+    roomId: roomCode, videoUrl: "https://example.com/movie.mp4", password: "room-secret",
   }, resolve));
+  const attacker = io(url, { auth: { token: hostRoom.inviteToken }, transports: ["websocket"] });
+  assert.equal((await waitFor(attacker, "connect_error")).message, "Unauthorized");
+  attacker.close();
+  const rejected = await new Promise((resolve) => guest.emit("join-room", { roomId: roomCode, password: "wrong" }, resolve));
+  assert.equal(rejected.error, "Mật khẩu phòng không đúng.");
   const guestRoom = await new Promise((resolve) => guest.emit("join-room", {
-    roomId: roomCode,
+    roomId: roomCode, password: "room-secret",
   }, resolve));
   assert.equal(hostRoom.isHost, true);
   assert.equal(guestRoom.isHost, false);
@@ -73,7 +78,7 @@ test("host seek synchronizes and host role transfers", async (t) => {
     };
     guest.on("room-state", onState);
   });
-  host.emit("room-action", { action: "seek", position: 42 });
+  guest.emit("room-action", { action: "seek", position: 42 });
   const update = await synced;
   assert.equal(update.state.position, 42);
   const persisted = await db.query("SELECT position FROM rooms WHERE code = $1", [roomCode]);

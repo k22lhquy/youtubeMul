@@ -7,9 +7,10 @@ async function request(path, options = {}) {
 
 const json = (body) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export const guestToken = async (name) => (await request("/api/auth/guest", json({ name }))).token;
 export const register = (values) => request("/api/auth/register", json(values));
 export const login = (values) => request("/api/auth/login", json(values));
+export const googleLogin = (credential) => request("/api/auth/google", json({ credential }));
+export const authConfig = () => request("/api/auth/config");
 export const roomHistory = (token) => request("/api/rooms", { headers: { Authorization: `Bearer ${token}` } });
 export async function uploadVideo(token, file) {
   const response = await fetch("/api/videos", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": file.type, "X-File-Name": encodeURIComponent(file.name) }, body: file });
