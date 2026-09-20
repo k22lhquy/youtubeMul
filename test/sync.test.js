@@ -8,7 +8,7 @@ const { Pool } = require("pg");
 const root = path.join(__dirname, "..");
 const waitFor = (emitter, event) => new Promise((resolve) => emitter.once(event, resolve));
 
-test("host seek synchronizes and host role transfers", async (t) => {
+test("every member can synchronize playback", async (t) => {
   const port = 3400 + Math.floor(Math.random() * 400);
   const app = spawn(process.execPath, ["server.js"], {
     cwd: root,
@@ -49,8 +49,8 @@ test("host seek synchronizes and host role transfers", async (t) => {
   const guestRoom = await new Promise((resolve) => guest.emit("join-room", {
     roomId: roomCode,
   }, resolve));
-  assert.equal(hostRoom.isHost, true);
-  assert.equal(guestRoom.isHost, false);
+  assert.equal(hostRoom.hostId, undefined);
+  assert.equal(guestRoom.isHost, undefined);
 
   const synced = new Promise((resolve) => {
     const onState = (update) => {
@@ -61,14 +61,11 @@ test("host seek synchronizes and host role transfers", async (t) => {
     };
     guest.on("room-state", onState);
   });
-  host.emit("room-action", { action: "seek", position: 42 });
+  guest.emit("room-action", { action: "seek", position: 42 });
   const update = await synced;
   assert.equal(update.state.position, 42);
   const persisted = await db.query("SELECT position FROM rooms WHERE code = $1", [roomCode]);
   assert.equal(persisted.rows[0].position, 42);
 
-  const transferred = waitFor(guest, "room-state");
-  host.close();
-  const afterHostLeaves = await transferred;
-  assert.equal(afterHostLeaves.isHost, true);
+  assert.deepEqual(update.members.map(({ name }) => name).sort(), ["Test Guest", "Test Host"]);
 });

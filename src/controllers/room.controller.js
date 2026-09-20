@@ -7,15 +7,14 @@ const validVideoUrl = (value) => {
 };
 const positionAt = (state, timestamp = now()) => state.playing ? state.position + (timestamp - state.changedAt) / 1000 : state.position;
 
-function snapshot(room, socketId) {
+function snapshot(room) {
   return {
-    roomId: room.id, state: room.state, serverNow: now(), hostId: room.hostId, isHost: room.hostId === socketId,
-    members: [...room.members.values()].map(({ id, name }) => ({ id, name, isHost: id === room.hostId })),
+    roomId: room.id, state: room.state, serverNow: now(), members: [...room.members.values()],
   };
 }
 
 function broadcast(io, room) {
-  room.members.forEach((_, socketId) => io.to(socketId).emit("room-state", snapshot(room, socketId)));
+  room.members.forEach((_, socketId) => io.to(socketId).emit("room-state", snapshot(room)));
 }
 
 function registerRoomSocket(io) {
@@ -26,14 +25,13 @@ function registerRoomSocket(io) {
       try {
         let room = await rooms.get(id);
         if (!room) {
-          if (!validVideoUrl(videoUrl)) return reply({ error: "Host cần nhập URL video HTTP(S)." });
-          room = await rooms.create({ id, hostId: socket.id, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
+          if (!validVideoUrl(videoUrl)) return reply({ error: "Cần nhập URL video HTTP(S) để tạo phòng." });
+          room = await rooms.create({ id, ownerId: socket.data.user.guest ? null : socket.data.user.sub, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
         }
-        if (!room.hostId) room.hostId = socket.id;
         socket.join(id);
         socket.data.roomId = id;
         room.members.set(socket.id, { id: socket.id, name: socket.data.user.name });
-        reply(snapshot(room, socket.id));
+        reply(snapshot(room));
         broadcast(io, room);
       } catch (error) {
         console.error(error);
@@ -44,7 +42,7 @@ function registerRoomSocket(io) {
     socket.on("room-action", async ({ action, position, videoUrl }) => {
       try {
         const room = await rooms.get(socket.data.roomId);
-        if (!room || room.hostId !== socket.id) return socket.emit("room-error", "Chỉ host được điều khiển video.");
+        if (!room || !room.members.has(socket.id)) return socket.emit("room-error", "Bạn chưa tham gia phòng.");
         const timestamp = now();
         const currentPosition = Math.max(0, positionAt(room.state, timestamp));
         if (action === "load" && validVideoUrl(videoUrl)) room.state = { videoUrl, playing: false, position: 0, changedAt: timestamp, version: room.state.version + 1 };
@@ -60,7 +58,7 @@ function registerRoomSocket(io) {
       }
     });
 
-    socket.on("sync-request", async () => { const room = await rooms.get(socket.data.roomId); if (room) socket.emit("room-state", snapshot(room, socket.id)); });
+    socket.on("sync-request", async () => { const room = await rooms.get(socket.data.roomId); if (room) socket.emit("room-state", snapshot(room)); });
     socket.on("clock-ping", (_, reply = () => {}) => reply(now()));
     socket.on("disconnect", async () => {
       try {
@@ -72,7 +70,6 @@ function registerRoomSocket(io) {
           await rooms.save(room);
           return rooms.release(room.id);
         }
-        if (room.hostId === socket.id) room.hostId = room.members.keys().next().value;
         broadcast(io, room);
       } catch (error) {
         console.error(error);
@@ -81,4 +78,9 @@ function registerRoomSocket(io) {
   });
 }
 
-module.exports = { registerRoomSocket };
+async function roomHistory(req, res) {
+  if (req.user.guest) return res.status(403).json({ error: "Cần tài khoản để xem lịch sử phòng." });
+  res.json({ rooms: await rooms.history(req.user.sub) });
+}
+
+module.exports = { registerRoomSocket, roomHistory };

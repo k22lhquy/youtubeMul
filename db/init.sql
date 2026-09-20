@@ -12,6 +12,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (LOWER(email)) WHE
 
 CREATE TABLE IF NOT EXISTS rooms (
   code VARCHAR(32) PRIMARY KEY,
+  owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
   video_url TEXT NOT NULL,
   playing BOOLEAN NOT NULL DEFAULT FALSE,
   position DOUBLE PRECISION NOT NULL DEFAULT 0 CHECK (position >= 0),
@@ -19,3 +20,6 @@ CREATE TABLE IF NOT EXISTS rooms (
   version INTEGER NOT NULL DEFAULT 1,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS rooms_owner_updated_idx ON rooms (owner_id, updated_at DESC);

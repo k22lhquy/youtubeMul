@@ -30,5 +30,8 @@ test("registers in the UI and creates a room with the account JWT", async (t) =>
   await page.getByRole("button", { name: "Tạo phòng" }).click();
   await page.waitForURL(/#.+/);
   roomCode = page.url().split("#")[1];
-  assert.match(await page.locator("body").innerText(), /UI Account \(host\)/);
+  assert.match(await page.locator("body").innerText(), /UI Account/);
+  await page.goto(`http://127.0.0.1:${port}`);
+  await page.getByText("Phòng gần đây").waitFor();
+  await page.getByRole("link", { name: new RegExp(roomCode) }).waitFor();
 });

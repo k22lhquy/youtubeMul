@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("node:path");
 const authRoutes = require("./routes/auth.routes");
+const roomRoutes = require("./routes/room.routes");
 const db = require("./config/database");
 
 const app = express();
@@ -12,6 +13,7 @@ app.get("/api/health", async (_, res) => {
   catch { res.status(503).json({ ok: false, database: "disconnected" }); }
 });
 app.use("/api/auth", authRoutes);
+app.use("/api/rooms", roomRoutes);
 app.use(express.static(clientDist));
 app.get("*splat", (_, res) => res.sendFile(path.join(clientDist, "index.html")));
 
