@@ -57,6 +57,17 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   await host.getByRole("button", { name: "Tạo phòng" }).click();
   await host.waitForURL(/#.+/);
   roomCode = host.url().split("#")[1];
+  const inviteUrl = `http://127.0.0.1:${port}/#${roomCode}`;
+  assert.equal(await host.getByLabel("Link mời").inputValue(), inviteUrl);
+  await host.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    document.execCommand = () => {
+      window.__copiedInvite = document.activeElement.value;
+      return true;
+    };
+  });
+  await host.getByRole("button", { name: "Sao chép link mời" }).click();
+  assert.equal(await host.evaluate(() => window.__copiedInvite), inviteUrl);
   await host.locator("video").waitFor();
   await waitUntil(() => host.locator("video").evaluate((video) => video.readyState >= 1));
   await host.getByRole("button", { name: "Phát", exact: true }).click();
