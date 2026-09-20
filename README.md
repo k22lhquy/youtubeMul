@@ -1,6 +1,6 @@
 # SyncScreen
 
-Web xem video cùng nhau: một người tạo phòng, gửi link mời, mọi người tự phát cùng một URL YouTube, MP4 hoặc HLS. Tất cả thành viên có thể điều khiển play, pause, seek; các client tự sửa lệch thời gian.
+Web xem video cùng nhau: host tạo phòng, gửi link mời, mọi người tự phát cùng một URL YouTube, MP4 hoặc HLS. Host điều khiển play, pause, seek; các client tự sửa lệch thời gian.
 
 ## Chạy local
 
@@ -13,9 +13,9 @@ npm start
 
 Mở `http://localhost:3000`. Khi code giao diện: chạy `npm start` và, ở terminal khác, chạy `npm run dev` rồi mở `http://localhost:5173`.
 
-1. Nhập tên và URL YouTube, MP4 hoặc HLS (`.m3u8`) có thể truy cập từ trình duyệt.
-2. Tạo phòng rồi bấm **Sao chép link mời**.
-3. Người khác mở link, nhập tên và tham gia. Không cần nhập lại URL video.
+1. Host nhập tên và URL YouTube, MP4 hoặc HLS (`.m3u8`) có thể truy cập từ trình duyệt.
+2. Host tạo phòng rồi bấm **Sao chép link mời**.
+3. Người khác mở link sẽ vào thẳng phòng bằng tên khách tự tạo và có thể đổi tên trong phòng.
 
 Mở hai cửa sổ trình duyệt để thử. Trình duyệt có thể yêu cầu người xem bấm Play lần đầu vì chính sách autoplay.
 
@@ -41,10 +41,12 @@ Database local chạy bằng Docker Compose tại `127.0.0.1:5432`. Cấu hình 
 ## Đồng bộ
 
 - Server giữ trạng thái chuẩn: URL, play/pause, vị trí và timestamp.
-- Mọi thành viên đều có thể gửi lệnh điều khiển.
+- Chỉ host gửi lệnh điều khiển.
 - Người xem lấy chênh lệch đồng hồ với server mỗi 5 giây.
+- Người mới vào đồng bộ đồng hồ và vị trí phát ngay từ trạng thái phòng đầu tiên.
 - Lệch 250 ms–1 giây: chỉnh playback rate nhẹ (`0.96` / `1.04`).
 - Lệch trên 1 giây: seek về vị trí chuẩn.
+- Host rời phòng: người vào sớm nhất thành host mới.
 
 ## Video và production
 
@@ -69,7 +71,7 @@ Railway tự deploy lại mỗi khi có commit mới trên `main`. Railway tự 
 npm test
 ```
 
-Test hiện có xác nhận mọi thành viên đều có thể sync seek đến cả phòng.
+Test hiện có xác nhận host sync seek đến guest và quyền host được chuyển khi host rời phòng.
 
 ## Giới hạn hiện tại
 

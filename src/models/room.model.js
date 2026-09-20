@@ -8,7 +8,7 @@ class RoomStore {
     const { rows } = await db.query("SELECT * FROM rooms WHERE code = $1", [id]);
     if (!rows[0]) return undefined;
     const row = rows[0];
-    const room = { id, members: new Map(), state: { videoUrl: row.video_url, playing: row.playing, position: row.position, changedAt: Number(row.changed_at), version: row.version } };
+    const room = { id, hostId: null, members: new Map(), state: { videoUrl: row.video_url, playing: row.playing, position: row.position, changedAt: Number(row.changed_at), version: row.version } };
     this.rooms.set(id, room);
     return room;
   }

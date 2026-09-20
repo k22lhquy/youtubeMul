@@ -9,14 +9,15 @@ const validVideoUrl = (value) => {
 };
 const positionAt = (state, timestamp = now()) => state.playing ? state.position + (timestamp - state.changedAt) / 1000 : state.position;
 
-function snapshot(room) {
+function snapshot(room, socketId) {
   return {
-    roomId: room.id, state: room.state, serverNow: now(), members: [...room.members.values()],
+    roomId: room.id, state: room.state, serverNow: now(), hostId: room.hostId, selfId: socketId, isHost: room.hostId === socketId,
+    members: [...room.members.values()].map(({ id, name }) => ({ id, name, isHost: id === room.hostId })),
   };
 }
 
 function broadcast(io, room) {
-  room.members.forEach((_, socketId) => io.to(socketId).emit("room-state", snapshot(room)));
+  room.members.forEach((_, socketId) => io.to(socketId).emit("room-state", snapshot(room, socketId)));
 }
 
 function registerRoomSocket(io) {
@@ -28,12 +29,13 @@ function registerRoomSocket(io) {
         let room = await rooms.get(id);
         if (!room) {
           if (!validVideoUrl(videoUrl)) return reply({ error: "Cần nhập URL video HTTP(S) để tạo phòng." });
-          room = await rooms.create({ id, ownerId: socket.data.user.guest ? null : socket.data.user.sub, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
+          room = await rooms.create({ id, ownerId: socket.data.user.guest ? null : socket.data.user.sub, hostId: socket.id, members: new Map(), state: { videoUrl, playing: false, position: 0, changedAt: now(), version: 1 } });
         }
+        if (!room.hostId) room.hostId = socket.id;
         socket.join(id);
         socket.data.roomId = id;
         room.members.set(socket.id, { id: socket.id, name: socket.data.user.name });
-        reply(snapshot(room));
+        reply(snapshot(room, socket.id));
         broadcast(io, room);
         socket.emit("chat-history", await messages.list(id));
       } catch (error) {
@@ -57,10 +59,25 @@ function registerRoomSocket(io) {
       }
     });
 
+    socket.on("rename-member", async (value, reply = () => {}) => {
+      try {
+        const room = await rooms.get(socket.data.roomId);
+        const name = String(value || "").trim().slice(0, 32);
+        if (!room?.members.has(socket.id)) return reply({ error: "Bạn chưa tham gia phòng." });
+        if (name.length < 2) return reply({ error: "Tên phải có ít nhất 2 ký tự." });
+        room.members.get(socket.id).name = name;
+        socket.data.user.name = name;
+        broadcast(io, room);
+        reply({ ok: true });
+      } catch {
+        reply({ error: "Không đổi được tên." });
+      }
+    });
+
     socket.on("room-action", async ({ action, position, videoUrl }) => {
       try {
         const room = await rooms.get(socket.data.roomId);
-        if (!room || !room.members.has(socket.id)) return socket.emit("room-error", "Bạn chưa tham gia phòng.");
+        if (!room || room.hostId !== socket.id) return socket.emit("room-error", "Chỉ host được điều khiển video.");
         const timestamp = now();
         const currentPosition = Math.max(0, positionAt(room.state, timestamp));
         if (action === "load" && validVideoUrl(videoUrl)) room.state = { videoUrl, playing: false, position: 0, changedAt: timestamp, version: room.state.version + 1 };
@@ -76,7 +93,7 @@ function registerRoomSocket(io) {
       }
     });
 
-    socket.on("sync-request", async () => { const room = await rooms.get(socket.data.roomId); if (room) socket.emit("room-state", snapshot(room)); });
+    socket.on("sync-request", async () => { const room = await rooms.get(socket.data.roomId); if (room) socket.emit("room-state", snapshot(room, socket.id)); });
     socket.on("clock-ping", (_, reply = () => {}) => reply(now()));
     socket.on("disconnect", async () => {
       try {
@@ -88,6 +105,7 @@ function registerRoomSocket(io) {
           await rooms.save(room);
           return rooms.release(room.id);
         }
+        if (room.hostId === socket.id) room.hostId = room.members.keys().next().value;
         broadcast(io, room);
       } catch (error) {
         console.error(error);

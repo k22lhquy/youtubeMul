@@ -8,7 +8,7 @@ const { Pool } = require("pg");
 const root = path.join(__dirname, "..");
 const waitFor = (emitter, event) => new Promise((resolve) => emitter.once(event, resolve));
 
-test("every member can synchronize playback", async (t) => {
+test("host seek synchronizes and host role transfers", async (t) => {
   const port = 3400 + Math.floor(Math.random() * 400);
   const app = spawn(process.execPath, ["server.js"], {
     cwd: root,
@@ -49,8 +49,20 @@ test("every member can synchronize playback", async (t) => {
   const guestRoom = await new Promise((resolve) => guest.emit("join-room", {
     roomId: roomCode,
   }, resolve));
-  assert.equal(hostRoom.hostId, undefined);
-  assert.equal(guestRoom.isHost, undefined);
+  assert.equal(hostRoom.isHost, true);
+  assert.equal(guestRoom.isHost, false);
+
+  const renamed = new Promise((resolve) => {
+    const onState = (update) => {
+      if (update.members.some(({ name }) => name === "Guest renamed")) {
+        host.off("room-state", onState);
+        resolve(update);
+      }
+    };
+    host.on("room-state", onState);
+  });
+  await new Promise((resolve) => guest.emit("rename-member", "Guest renamed", resolve));
+  assert.ok((await renamed).members.some(({ name }) => name === "Guest renamed"));
 
   const synced = new Promise((resolve) => {
     const onState = (update) => {
@@ -61,7 +73,7 @@ test("every member can synchronize playback", async (t) => {
     };
     guest.on("room-state", onState);
   });
-  guest.emit("room-action", { action: "seek", position: 42 });
+  host.emit("room-action", { action: "seek", position: 42 });
   const update = await synced;
   assert.equal(update.state.position, 42);
   const persisted = await db.query("SELECT position FROM rooms WHERE code = $1", [roomCode]);
@@ -73,5 +85,8 @@ test("every member can synchronize playback", async (t) => {
   const persistedMessage = await db.query("SELECT content FROM messages WHERE room_code = $1", [roomCode]);
   assert.equal(persistedMessage.rows[0].content, "xin chào");
 
-  assert.deepEqual(update.members.map(({ name }) => name).sort(), ["Test Guest", "Test Host"]);
+  const transferred = waitFor(guest, "room-state");
+  host.close();
+  const afterHostLeaves = await transferred;
+  assert.equal(afterHostLeaves.isHost, true);
 });

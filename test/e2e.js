@@ -36,17 +36,20 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   const hostName = `E2E Host ${suffix}`;
   const guestName = `E2E Guest ${suffix}`;
   let roomCode;
+  let guestId;
   t.after(async () => {
     if (roomCode) {
       const { rows } = await db.query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
       await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
       if (rows[0]?.video_url.startsWith("/uploads/")) await fs.promises.rm(path.join(root, rows[0].video_url.replace(/^\//, "")), { force: true });
     }
-    await db.query("DELETE FROM users WHERE name = ANY($1::text[])", [[hostName, guestName]]);
+    await db.query("DELETE FROM users WHERE name = $1", [hostName]);
+    if (guestId) await db.query("DELETE FROM users WHERE id = $1", [guestId]);
     await db.end();
   });
   const host = await browser.newPage();
   const guest = await browser.newPage();
+  await guest.addInitScript(() => { const now = Date.now; Date.now = () => now() + 60_000; });
   const errors = [];
   host.on("pageerror", (error) => errors.push(`host: ${error.message}`));
   guest.on("pageerror", (error) => errors.push(`guest: ${error.message}`));
@@ -73,12 +76,15 @@ test("host plays, guest joins, and playback stays synchronized", async (t) => {
   await host.getByRole("button", { name: "Phát", exact: true }).click();
   await waitUntil(() => host.locator("video").evaluate((video) => video.currentTime > 0.5));
 
+  const guestAuth = guest.waitForResponse((response) => response.url().endsWith("/api/auth/guest"));
   await guest.goto(host.url());
-  await guest.locator('input[placeholder="Quy"]').fill(guestName);
-  await guest.getByRole("button", { name: "Tham gia phòng" }).click();
+  guestId = (await (await guestAuth).json()).user.id;
   await guest.locator("video").waitFor();
   await waitUntil(() => guest.locator("video").evaluate((video) => video.readyState >= 1));
   await waitUntil(() => guest.locator("video").evaluate((video) => !video.paused && video.currentTime > 0));
+  await guest.getByLabel("Tên hiển thị").fill(guestName);
+  await guest.getByRole("button", { name: "Đổi tên" }).click();
+  await host.getByText(new RegExp(guestName)).waitFor();
 
   await guest.getByLabel("Tin nhắn").fill("xin chào từ guest");
   await guest.getByRole("button", { name: "Gửi" }).click();

@@ -24,11 +24,12 @@ test("YouTube URL loads and synchronizes play state", async (t) => {
   const db = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://syncscreen:syncscreen-local@127.0.0.1:5432/syncscreen" });
   const suffix = Date.now();
   const hostName = `YouTube Host ${suffix}`;
-  const guestName = `YouTube Guest ${suffix}`;
   let roomCode;
+  let guestId;
   t.after(async () => {
     if (roomCode) await db.query("DELETE FROM rooms WHERE code = $1", [roomCode]);
-    await db.query("DELETE FROM users WHERE name = ANY($1::text[])", [[hostName, guestName]]);
+    await db.query("DELETE FROM users WHERE name = $1", [hostName]);
+    if (guestId) await db.query("DELETE FROM users WHERE id = $1", [guestId]);
     await db.end();
   });
 
@@ -53,9 +54,9 @@ test("YouTube URL loads and synchronizes play state", async (t) => {
   }
   await host.getByText("Đang phát đồng bộ").waitFor();
 
+  const guestAuth = guest.waitForResponse((response) => response.url().endsWith("/api/auth/guest"));
   await guest.goto(host.url());
-  await guest.locator('input[placeholder="Quy"]').fill(guestName);
-  await guest.getByRole("button", { name: "Tham gia phòng" }).click();
+  guestId = (await (await guestAuth).json()).user.id;
   await guest.locator(`iframe[src*="youtube.com/embed/${videoId}"]`).waitFor({ timeout: 20_000 });
   await guest.getByText("Đang phát đồng bộ").waitFor();
   await guest.locator('iframe[data-player-state="1"]').waitFor({ timeout: 20_000 });

@@ -23,7 +23,7 @@ export function useWatchRoom(playerRef) {
     const drift = expectedPosition(next) - player.currentTime;
     applyingRef.current = Date.now() + 700;
     if (Math.abs(drift) > 1 || (Math.abs(drift) > 0.25 && player.canNudge === false)) player.currentTime = expectedPosition(next);
-    else if (Math.abs(drift) > 0.25) {
+    else if (Math.abs(drift) > 0.25 && !next.isHost) {
       player.playbackRate = drift > 0 ? 1.04 : 0.96;
       window.setTimeout(() => { player.playbackRate = 1; }, 1800);
     }
@@ -38,8 +38,10 @@ export function useWatchRoom(playerRef) {
       const socket = socketRef.current;
       if (!socket?.connected) return;
       const sentAt = Date.now();
-      socket.emit("clock-ping", null, (serverNow) => { clockOffset.current = serverNow - (sentAt + Date.now()) / 2; });
-      if (room) syncPlayback();
+      socket.emit("clock-ping", null, (serverNow) => {
+        clockOffset.current = serverNow - (sentAt + Date.now()) / 2;
+        if (room && !room.isHost) syncPlayback();
+      });
     }, 5000);
     return () => window.clearInterval(timer);
   }, [room, syncPlayback]);
@@ -52,7 +54,8 @@ export function useWatchRoom(playerRef) {
       if (videoFile) { setStatus("Đang upload video…"); videoUrl = await uploadVideo(authToken, videoFile); }
       const socket = io({ auth: { token: authToken } });
       socketRef.current = socket;
-      socket.on("room-state", (next) => { setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); });
+      const receiveRoom = (next) => { clockOffset.current = next.serverNow - Date.now(); setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); };
+      socket.on("room-state", receiveRoom);
       socket.on("room-error", setError);
       socket.on("chat-history", setMessages);
       socket.on("chat-message", (message) => setMessages((current) => [...current, message].slice(-50)));
@@ -61,19 +64,20 @@ export function useWatchRoom(playerRef) {
       socket.on("connect", () => socket.emit("join-room", { roomId, videoUrl }, (next) => {
         if (next.error) return setError(next.error);
         history.replaceState({}, "", `/#${next.roomId}`);
-        setRoom(next);
+        receiveRoom(next);
       }));
     } catch (err) { setError(err.message); }
   }, []);
 
   const action = useCallback((action, extra = {}, force = false) => {
     const player = playerRef.current;
-    if (!room || (!force && (!player || Date.now() < applyingRef.current))) return;
+    if (!room?.isHost || (!force && (!player || Date.now() < applyingRef.current))) return;
     socketRef.current?.emit("room-action", { action, position: player?.currentTime ?? expectedPosition(), ...extra });
   }, [expectedPosition, playerRef, room]);
 
   const control = useCallback((name, extra = {}) => action(name, extra, true), [action]);
+  const rename = useCallback((name) => socketRef.current?.emit("rename-member", name, (result) => result.error && setError(result.error)), []);
   const sendChat = useCallback((content) => socketRef.current?.emit("chat-message", content, (result) => result.error && setError(result.error)), []);
   const uploadAndLoad = useCallback(async (file) => { try { setStatus("Đang upload video…"); control("load", { videoUrl: await uploadVideo(tokenRef.current, file) }); } catch (err) { setError(err.message); } }, [control]);
-  return { room, status, error, messages, join, action, control, sendChat, uploadAndLoad, syncPlayback, reportError: setError };
+  return { room, status, error, messages, join, action, control, rename, sendChat, uploadAndLoad, syncPlayback, reportError: setError };
 }
