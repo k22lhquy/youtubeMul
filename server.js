@@ -13,7 +13,7 @@ io.use(socketAuth);
 registerRoomSocket(io);
 
 async function start() {
-  await db.query("SELECT 1");
+  await db.migrate();
   server.listen(port, () => console.log(`SyncScreen running at http://localhost:${port}`));
 }
 

@@ -32,7 +32,7 @@ client/src/
   hooks/        # useWatchRoom
 ```
 
-- Backend: Express MVC, Socket.IO, PostgreSQL và JWT guest token 24 giờ.
+- Backend: Express MVC, Socket.IO, PostgreSQL, tài khoản/password hash bằng scrypt và JWT.
 - Frontend: React, Vite, Tailwind CSS và custom hook `useWatchRoom`.
 - PostgreSQL lưu guest và trạng thái phòng; thành viên đang online vẫn nằm trong RAM vì socket là kết nối tạm thời.
 
@@ -74,5 +74,5 @@ Test hiện có xác nhận host sync seek đến guest và quyền host đượ
 
 ## Giới hạn hiện tại
 
-- Chưa có tài khoản/password, chat, upload hay giao diện lịch sử phòng.
+- Chưa có chat, upload hay giao diện lịch sử phòng.
 - Chỉ dùng video bạn có quyền chia sẻ; không rehost hoặc vượt điều khoản nguồn video.

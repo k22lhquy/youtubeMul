@@ -9,8 +9,9 @@
     "build": "vite build --config client/vite.config.js",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
-    "test": "node --test test/sync.test.js test/video-source.test.mjs",
+    "test": "node --test --test-concurrency=1 test/auth.test.js test/sync.test.js test/video-source.test.mjs",
     "test:e2e": "node --test test/e2e.js",
+    "test:e2e:account": "node --test test/account-e2e.js",
     "test:e2e:youtube": "node --test test/youtube-e2e.js"
   },
   "dependencies": {

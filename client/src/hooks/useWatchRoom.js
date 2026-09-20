@@ -42,11 +42,11 @@ export function useWatchRoom(playerRef) {
     return () => window.clearInterval(timer);
   }, [room, syncPlayback]);
 
-  const join = useCallback(async ({ name, roomId, videoUrl }) => {
+  const join = useCallback(async ({ name, token, roomId, videoUrl }) => {
     setError(""); setStatus("Đang kết nối…");
     try {
-      const token = await guestToken(name);
-      const socket = io({ auth: { token } });
+      const authToken = token || await guestToken(name);
+      const socket = io({ auth: { token: authToken } });
       socketRef.current = socket;
       socket.on("room-state", (next) => { setRoom(next); setStatus(next.state.playing ? "Đang phát đồng bộ" : "Đã tạm dừng đồng bộ"); });
       socket.on("room-error", setError);
